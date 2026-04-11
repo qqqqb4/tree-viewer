@@ -18,7 +18,6 @@ auto walk_dir(Dir& dir, std::vector<std::string>& exclude) -> void {
         bool skip = false;
         for (size_t i = 0; i < exclude.size(); i++) {
             if (it->path().filename().string() == exclude[i]) {
-                exclude.erase(exclude.begin() + i);
                 skip = true;
                 break;
             }
@@ -35,42 +34,26 @@ auto walk_dir(Dir& dir, std::vector<std::string>& exclude) -> void {
     }
 }
 
-auto draw_spaces(int depth) -> void {
-    for (size_t i = 0; i < depth; i++) {
-        std::cout << "│   ";
-    }
-}
-
-auto draw_spaces_last(int depth) -> void {
-    std::cout << "    ";
-    for (size_t i = 1; i < depth; i++) {
-        std::cout << "│   ";
-    }
-}
-
-auto (*draw_spaces_func)(int depth) -> void = draw_spaces;
-
-auto draw(Dir& dir, int& depth) -> void {
+auto draw(Dir& dir, std::string prefix) -> void {
     for (size_t i = 0; i < dir.dirs.size(); i++) {
-        draw_spaces_func(depth);
-        if (i == dir.dirs.size() - 1 && depth == 0 && dir.files.empty()) {
-            std::cout << "└───" << dir.dirs[i].path.filename().string()
-                      << std::endl;
-            draw_spaces_func = draw_spaces_last;
+        std::string new_prefix;
+        if (i == dir.dirs.size() - 1 && dir.files.empty()) {
+            new_prefix = "    ";
+            std::cout << prefix << "└───\uf4d4"
+                      << dir.dirs[i].path.filename().string() << std::endl;
         } else {
-            std::cout << "├───" << dir.dirs[i].path.filename().string()
-                      << std::endl;
+            new_prefix = "│   ";
+            std::cout << prefix << "├───\uf4d4"
+                      << dir.dirs[i].path.filename().string() << std::endl;
         }
-
-        draw(dir.dirs[i], ++depth);
-        depth--;
+        draw(dir.dirs[i], prefix + new_prefix);
     }
+
     for (size_t i = 0; i < dir.files.size(); i++) {
-        draw_spaces_func(depth);
         if (i == dir.files.size() - 1) {
-            std::cout << "└───" << dir.files[i] << std::endl;
+            std::cout << prefix << "└───" << dir.files[i] << std::endl;
         } else {
-            std::cout << "├───" << dir.files[i] << std::endl;
+            std::cout << prefix << "├───" << dir.files[i] << std::endl;
         }
     }
 }
@@ -84,21 +67,22 @@ auto sort(Dir& dir) -> void {
     }
 }
 
-auto run(fs::path def, std::vector<std::string> exclude) -> void {
+auto run(fs::path& def, std::vector<std::string>& exclude) -> void {
+    std::system("clear");
     std::cout << ("\033[2J\033[H");
     Dir base = {def, 1, {}, {}};
-    int depth = 0;
 
     walk_dir(base, exclude);
     sort(base);
-    draw(base, depth);
+    std::cout << "\uf4d4" << def.filename().string() << std::endl;
+    draw(base, "");
 }
 
 auto main(int argc, char* argv[]) -> int {
-    fs::path def = ".";
+    fs::path def = fs::current_path();
     std::vector<std::string> exclude{".git"};
     if (argc > 1) {
-        def = argv[1];  // TODO remove
+        def = argv[1];
     }
     if (argc > 2) {
         for (int i = 2; i < argc; i++) {
@@ -120,5 +104,6 @@ auto main(int argc, char* argv[]) -> int {
 // [x] Sorting (by name)
 // [x] Ignore options (input args)
 //     [-] .gitignore support
-// [x?] Proper drawing ( └─├│ )
+// [x] Proper drawing ( └─├│ )
 // [-] Interactive TUI (close/open dirs)
+// [-] Search option
