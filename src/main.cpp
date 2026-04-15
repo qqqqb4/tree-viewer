@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,7 @@ struct Dir {
     std::vector<std::string> files;
 };
 
-auto walk_dir(Dir& dir, std::vector<std::string>& exclude) -> void {
+auto walk_dir(Dir& dir, std::vector<std::string_view>& exclude) -> void {
     for (fs::directory_iterator it{dir.path}, end; it != end; it++) {
         bool skip = false;
         for (size_t i = 0; i < exclude.size(); i++) {
@@ -36,19 +37,26 @@ auto walk_dir(Dir& dir, std::vector<std::string>& exclude) -> void {
 
 auto draw(Dir& dir, std::string prefix) -> void {
     for (size_t i = 0; i < dir.dirs.size(); i++) {
-        std::string new_prefix;
-        if (i == dir.dirs.size() - 1 && dir.files.empty()) {
-            new_prefix = "    ";
-            std::cout << prefix << "└───\uf4d4"
-                      << dir.dirs[i].path.filename().string() << std::endl;
+        if (dir.is_shown) {
+            if (i == dir.dirs.size() - 1 && dir.files.empty()) {
+                std::cout << prefix << "└───\uf4d4"
+                          << dir.dirs[i].path.filename().string() << std::endl;
+                draw(dir.dirs[i], prefix + "    ");
+            } else {
+                std::cout << prefix << "├───\uf4d4"
+                          << dir.dirs[i].path.filename().string() << std::endl;
+                draw(dir.dirs[i], prefix + "│   ");
+            }
         } else {
-            new_prefix = "│   ";
-            std::cout << prefix << "├───\uf4d4"
-                      << dir.dirs[i].path.filename().string() << std::endl;
+            if (i == dir.dirs.size() - 1 && dir.files.empty()) {
+                std::cout << prefix << "└───\uf4d4"
+                          << dir.dirs[i].path.filename().string() << std::endl;
+            } else {
+                std::cout << prefix << "├───\uf4d4"
+                          << dir.dirs[i].path.filename().string() << std::endl;
+            }
         }
-        draw(dir.dirs[i], prefix + new_prefix);
     }
-
     for (size_t i = 0; i < dir.files.size(); i++) {
         if (i == dir.files.size() - 1) {
             std::cout << prefix << "└───" << dir.files[i] << std::endl;
@@ -67,20 +75,19 @@ auto sort(Dir& dir) -> void {
     }
 }
 
-auto run(fs::path& def, std::vector<std::string>& exclude) -> void {
-    std::system("clear");
-    std::cout << ("\033[2J\033[H");
+auto run(fs::path& def, std::vector<std::string_view>& exclude) -> void {
     Dir base = {def, 1, {}, {}};
-
+    system("clear");
     walk_dir(base, exclude);
     sort(base);
     std::cout << "\uf4d4" << def.filename().string() << std::endl;
     draw(base, "");
+    std::cout << ": " << std::flush;
 }
 
 auto main(int argc, char* argv[]) -> int {
     fs::path def = fs::current_path();
-    std::vector<std::string> exclude{".git"};
+    std::vector<std::string_view> exclude{".git"};
     if (argc > 1) {
         def = argv[1];
     }
@@ -90,20 +97,23 @@ auto main(int argc, char* argv[]) -> int {
         }
     }
     run(def, exclude);
-
     while (1) {
-        if (std::cin.get()) {
-            run(def, exclude);
+        std::string input;
+        if (std::getline(std::cin, input)) {
+            for (auto word_it : std::ranges::views::split(input, ' ')) {
+                auto word = std::string_view(word_it.begin(), word_it.end());
+                if (word == "exit" || word == "quit") {
+                    std::cout << ("\033[2J\033[H");
+                    return 0;
+                }
+            }
         }
+        run(def, exclude);
     }
     return 0;
 }
 
 // TODO
-// [x] Storing data
-// [x] Sorting (by name)
-// [x] Ignore options (input args)
-//     [-] .gitignore support
-// [x] Proper drawing ( └─├│ )
-// [-] Interactive TUI (close/open dirs)
-// [-] Search option
+// [-] .gitignore support
+// [-] Interactive TUI? (close/open dirs)
+// [-] Search
