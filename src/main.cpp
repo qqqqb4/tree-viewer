@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <ranges>
 #include <string>
@@ -9,12 +10,30 @@ namespace fs = std::filesystem;
 
 struct Dir {
     fs::path path;
-    bool is_shown = 1;
+    bool is_shown = 1;  // TODO
     std::vector<Dir> dirs;
     std::vector<std::string> files;
 };
 
-auto walk_dir(Dir& dir, std::vector<std::string_view>& exclude) -> void {
+auto parse_gitignore(std::vector<std::string>& exclude) -> void {
+    exclude.clear();
+    std::ifstream file(".gitignore");
+    if (file.is_open()) {
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            std::erase_if(
+                line, [](char c) { return c == '*' || c == '/' || c == '\\'; });
+            exclude.push_back(line);
+        }
+    }
+    file.close();
+    exclude.push_back(".git");
+}
+
+auto walk_dir(Dir& dir, std::vector<std::string>& exclude) -> void {
     for (fs::directory_iterator it{dir.path}, end; it != end; it++) {
         bool skip = false;
         for (size_t i = 0; i < exclude.size(); i++) {
@@ -75,9 +94,10 @@ auto sort(Dir& dir) -> void {
     }
 }
 
-auto run(fs::path& def, std::vector<std::string_view>& exclude) -> void {
+auto run(fs::path& def, std::vector<std::string>& exclude) -> void {
     Dir base = {def, 1, {}, {}};
     system("clear");
+    parse_gitignore(exclude);
     walk_dir(base, exclude);
     sort(base);
     std::cout << "\uf4d4" << def.filename().string() << std::endl;
@@ -87,7 +107,7 @@ auto run(fs::path& def, std::vector<std::string_view>& exclude) -> void {
 
 auto main(int argc, char* argv[]) -> int {
     fs::path def = fs::current_path();
-    std::vector<std::string_view> exclude{".git"};
+    std::vector<std::string> exclude{};
     if (argc > 1) {
         def = argv[1];
     }
@@ -103,7 +123,7 @@ auto main(int argc, char* argv[]) -> int {
             for (auto word_it : std::ranges::views::split(input, ' ')) {
                 auto word = std::string_view(word_it.begin(), word_it.end());
                 if (word == "exit" || word == "quit") {
-                    std::cout << ("\033[2J\033[H");
+                    system("clear");
                     return 0;
                 }
             }
@@ -114,6 +134,5 @@ auto main(int argc, char* argv[]) -> int {
 }
 
 // TODO
-// [-] .gitignore support
 // [-] Interactive TUI? (close/open dirs)
 // [-] Search
